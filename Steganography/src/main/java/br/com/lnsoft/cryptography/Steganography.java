@@ -10,14 +10,14 @@ public class Steganography {
 
 	private static final int COMPRESSION_FACTOR = 4;
 
-	private static final int BMP_HEADER_SIZE_MAX = 124;
+	private static final int DIB_HEADER_OFFSET = 14;
+	private static final int SIGNATURE_OFFSET = 6;
 
-	private static final int SIGNATURE_HEADER_SIZE = 32 / COMPRESSION_FACTOR;
 	private static final int LENGTH_HEADER_SIZE = 32 / COMPRESSION_FACTOR;
 	private static final int OFFSET_HEADER_SIZE = 32 / COMPRESSION_FACTOR;
 	private static final int HASH_HEADER_SIZE = 128 / COMPRESSION_FACTOR;
 
-	private static final byte[] SIGNATURE = new byte[] { (byte) 0xf0, (byte) 0x12, (byte) 0xfd, (byte) 0x0f };
+	private static final byte[] SIGNATURE = new byte[] { (byte) 0x4c, (byte) 0x4e, (byte) 0x76, (byte) 0x31 };
 
 	private static final int INT_SIZE = 4;
 
@@ -51,15 +51,17 @@ public class Steganography {
 					"Signature detected. Set force flag to use this image to encode data in. Previous data encoded will be lost.");
 		}
 		// add SIGNATURE
-		encodeSignature(image);
+		setImageSignature(image);
+		// compute base header offset
+		int baseHeaderOffset = computeBaseHeaderOffset(image);
 		// add data length
-		encodeDataLength(image, data.length);
+		encodeDataLength(image, baseHeaderOffset, data.length);
 		// computeImageOffset
-		int offset = computeImageOffset(image.length, data.length);
+		int offset = computeImageOffset(baseHeaderOffset, image.length, data.length);
 		// add data offset
-		encodeDataOffset(image, offset);
+		encodeDataOffset(image, baseHeaderOffset, offset);
 		// add hash
-		encodeDataHash(image, data);
+		encodeDataHash(image, baseHeaderOffset, data);
 		// encodeBytes
 		encodeData = encodeDataBytes(image, offset, data);
 		//
@@ -76,18 +78,20 @@ public class Steganography {
 		if (!checkSignature(image)) {
 			throw new IllegalArgumentException("Decode error. Invalid signature");
 		}
+		// compute base header offset
+		int baseHeaderOffset = computeBaseHeaderOffset(image);
 		// retrieve length
-		int dataLength = decodeDataLength(image);
+		int dataLength = decodeDataLength(image, baseHeaderOffset);
 		// computeImageOffset
-		int offset = computeImageOffset(image.length, dataLength);
+		int offset = computeImageOffset(baseHeaderOffset, image.length, dataLength);
 		// retrieve offset
-		int dataOffset = decodeDataOffset(image);
+		int dataOffset = decodeDataOffset(image, baseHeaderOffset);
 		// check compute and retrieved data offset
 		if (offset != dataOffset) {
 			throw new IllegalArgumentException("Decode error. Invalid offset");
 		}
 		// retrieve hash
-		byte[] hash = decodeDataHash(image);
+		byte[] hash = decodeDataHash(image, baseHeaderOffset);
 		// decodeBytes
 		decodeData = decodeDataBytes(image, offset, dataLength);
 		// check hash
@@ -143,18 +147,26 @@ public class Steganography {
 
 	//
 	// Signature methods
+	// Use the Unused 2 fields at BMP Header
+	// 2 bytes at offset 6 and 2 bytes more at offset 8
+	// add and retrieve a predefined signature
 	//
 
 	// encode
-	private void encodeSignature(final byte[] image) {
+	private void setImageSignature(final byte[] image) {
 		// add SIGNATURE
-		encodeDataBytes(image, BMP_HEADER_SIZE_MAX, SIGNATURE);
+		for (int idx = 0; idx < SIGNATURE.length; idx++) {
+			image[SIGNATURE_OFFSET + idx] = SIGNATURE[idx];
+		}
 	}
 
 	// decode
-	private byte[] decodeSignature(final byte[] image) {
+	private byte[] getImageSignature(final byte[] image) {
 		// retrieve SIGNATURE
-		byte[] signature = decodeDataBytes(image, BMP_HEADER_SIZE_MAX, SIGNATURE.length);
+		byte[] signature = new byte[SIGNATURE.length];
+		for (int idx = 0; idx < SIGNATURE.length; idx++) {
+			signature[idx] = image[SIGNATURE_OFFSET + idx];
+		}
 		// return decoded signature
 		return signature;
 	}
@@ -162,7 +174,7 @@ public class Steganography {
 	// check
 	private boolean checkSignature(final byte[] image) {
 		// compare signatures
-		return Arrays.equals(decodeSignature(image), SIGNATURE);
+		return Arrays.equals(getImageSignature(image), SIGNATURE);
 	}
 
 	//
@@ -170,15 +182,15 @@ public class Steganography {
 	//
 
 	// encode length
-	private void encodeDataLength(final byte[] image, final int length) {
+	private void encodeDataLength(final byte[] image, final int baseHeaderOffset, final int length) {
 		// add data length
-		encodeDataBytes(image, BMP_HEADER_SIZE_MAX + SIGNATURE_HEADER_SIZE, int2ByteArray(length));
+		encodeDataBytes(image, baseHeaderOffset, int2ByteArray(length));
 	}
 
 	// decode length
-	private int decodeDataLength(final byte[] image) {
+	private int decodeDataLength(final byte[] image, final int baseHeaderOffset) {
 		int dataLength = 0;
-		byte[] byteLength = decodeDataBytes(image, BMP_HEADER_SIZE_MAX + SIGNATURE_HEADER_SIZE, INT_SIZE);
+		byte[] byteLength = decodeDataBytes(image, baseHeaderOffset, INT_SIZE);
 		dataLength = byteArray2Int(byteLength);
 		return dataLength;
 	}
@@ -188,35 +200,47 @@ public class Steganography {
 	//
 
 	// encode offset
-	private void encodeDataOffset(final byte[] image, final int offset) {
+	private void encodeDataOffset(final byte[] image, final int baseHeaderOffset, final int offset) {
 		// add data offset
-		encodeDataBytes(image, BMP_HEADER_SIZE_MAX + SIGNATURE_HEADER_SIZE + LENGTH_HEADER_SIZE, int2ByteArray(offset));
+		encodeDataBytes(image, baseHeaderOffset + LENGTH_HEADER_SIZE, int2ByteArray(offset));
 	}
 
 	// decode offset
-	private int decodeDataOffset(final byte[] image) {
+	private int decodeDataOffset(final byte[] image, final int baseHeaderOffset) {
 		int dataOffset = 0;
-		byte[] decodeDataBytes = decodeDataBytes(image,
-				BMP_HEADER_SIZE_MAX + SIGNATURE_HEADER_SIZE + LENGTH_HEADER_SIZE, INT_SIZE);
+		byte[] decodeDataBytes = decodeDataBytes(image, baseHeaderOffset + LENGTH_HEADER_SIZE, INT_SIZE);
 		dataOffset = byteArray2Int(decodeDataBytes);
 		return dataOffset;
+	}
+
+	private int computeBaseHeaderOffset(byte[] image) {
+		// compute base offset
+		int baseHeaderOffset = 0;
+		int dibHeaderSize = 0;
+		byte[] dibData = (new byte[] { image[DIB_HEADER_OFFSET + 3], image[DIB_HEADER_OFFSET + 2],
+				image[DIB_HEADER_OFFSET + 1], image[DIB_HEADER_OFFSET] });
+		for (int idx = 0; idx < INT_SIZE; idx++) {
+			dibHeaderSize = (dibHeaderSize << 8) | (dibData[idx] & 0xFF);
+		}
+		baseHeaderOffset = DIB_HEADER_OFFSET + dibHeaderSize;
+		// return baseHeaderOffset
+		return baseHeaderOffset;
 	}
 
 	// compute offset
 	// headerSize | valid data area
 	// max offset consider original image length minus data length * <compression factor> (=8/bits per image byte)
 	// minus total header size
-	private int computeImageOffset(final int imageLength, final int dataLength) {
+	private int computeImageOffset(final int baseHeaderOffset, final int imageLength, final int dataLength) {
 		int offset = 0;
 		Random rand = new Random(seed);
-		int headerSize = BMP_HEADER_SIZE_MAX + SIGNATURE_HEADER_SIZE + LENGTH_HEADER_SIZE + OFFSET_HEADER_SIZE
-				+ HASH_HEADER_SIZE;
+		int headerSize = baseHeaderOffset + LENGTH_HEADER_SIZE + OFFSET_HEADER_SIZE + HASH_HEADER_SIZE;
 		int compressionFactor = 8 / COMPRESSION_FACTOR;
 		int maxOffset = imageLength - ((compressionFactor * dataLength) + headerSize);
 		offset = rand.nextInt(maxOffset) + headerSize;
 		if (offset < headerSize || offset > maxOffset) {
 			throw new IllegalArgumentException(
-					String.format("Invalid offset. Must be between %d and %d.", BMP_HEADER_SIZE_MAX, maxOffset));
+					String.format("Invalid offset. Must be between %d and %d.", baseHeaderOffset, maxOffset));
 		}
 		return offset;
 	}
@@ -225,14 +249,12 @@ public class Steganography {
 	// Hash
 	//
 
-	private void encodeDataHash(final byte[] image, final byte[] data) {
-		encodeDataBytes(image, BMP_HEADER_SIZE_MAX + SIGNATURE_HEADER_SIZE + LENGTH_HEADER_SIZE + OFFSET_HEADER_SIZE,
-				computeHash(data));
+	private void encodeDataHash(final byte[] image, final int baseHeaderOffset, final byte[] data) {
+		encodeDataBytes(image, baseHeaderOffset + LENGTH_HEADER_SIZE + OFFSET_HEADER_SIZE, computeHash(data));
 	}
 
-	private byte[] decodeDataHash(final byte[] image) {
-		byte[] hash = decodeDataBytes(image,
-				BMP_HEADER_SIZE_MAX + SIGNATURE_HEADER_SIZE + LENGTH_HEADER_SIZE + OFFSET_HEADER_SIZE, 16);
+	private byte[] decodeDataHash(final byte[] image, final int baseHeaderOffset) {
+		byte[] hash = decodeDataBytes(image, baseHeaderOffset + LENGTH_HEADER_SIZE + OFFSET_HEADER_SIZE, 16);
 		return hash;
 	}
 

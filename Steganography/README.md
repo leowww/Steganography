@@ -1,18 +1,16 @@
 # Steganography
 
-From [Wikipedia](https://en.wikipedia.org/wiki/Steganography), **Steganography** is the practice of concealing a file, message, image, or video within another file, message, image, or video. The word steganography combines the Greek words steganos, meaning "covered, concealed, or protected", and graphein meaning "writing". 
+From [Wikipedia](https://en.wikipedia.org/wiki/Steganography), **Steganography** is the practice of concealing a file, message, image, or video within another file, message, image, or video. The word steganography combines the Greek words steganos, meaning "covered, concealed, or protected", and graphein meaning "writing".
 
-In this implementation I will only restrict the target file to bitmaps images cause it is a large file with a small header fingerprint.
+This implementation only restrict the target file to bitmaps images because it is usually a large file with a small header footprint.
 
-Just run Maven install to create the artifacts.
+A bitmap image file is composed of pixels
 
-Maven will create the runnable jar with this name:
+# Maven 
 
-"steganography-1.0.0-SNAPSHOT-jar-with-dependencies.jar"
+Run Maven *install* to create the artifacts. Maven will create the runnable jar named *"steganography-1.0.0-SNAPSHOT-jar-with-dependencies.jar"* to simplify I will name it just *"steganoCLI.jar"*.
 
-To simplify name it to steganoCLI.jar
-
-Run as a Jar file with this command line:
+Run it as a Jar file with this command line:
 
 	>java -jar steganoCLI.jar
 	Mode must be 'encode' or 'decode'
@@ -31,15 +29,36 @@ Run as a Jar file with this command line:
 	 -ss,--seed_string <arg>   set seed string
 	 -sv,--seed_value <arg>    set seed value: must be a number value
 
-To encode (first argument -ae) a data file within a bitmap image use this command line:
+# Encode
+
+To **encode** (first argument '-ae') a data file within a bitmap image use this command line:
 
 	>java -jar steganoCLI.jar -ae -ii fsociety.bmp -io fsociety_out.bmp -di mr_robot.jpg -ss secret_seed
 
-The -ii argument will specify the bitmap "image input" and the -io the bitmap "image output"
+The '-ii' argument will specify the bitmap "image input" and the '-io' the bitmap "image output".
 
-The -di argument is the "data input" in this case a JPEG image and the -ss define a "seed string"
+The '-di' argument is the "data input" in this case a JPEG image and the '-ss' define a "seed string".
 
-To decode (first argument -ad) the data file from the encoded bitmap file use this command line:
+# Decode
+
+To **decode** (first argument '-ad') the data file from the encoded bitmap file use this command line:
 
 	>java -jar steganoCLI.jar -ad -ii fsociety_out.bmp -do mr_robot.jpg -ss secret_seed
 
+The '-ii' argument will specify the bitmap "image input" with the concealed data.
+
+The '-do' argument is the "data output" in this case the data within the bitmap and the '-ss' must be the same "seed string" used in the encoding process.
+
+# Parameters
+
+Use '-f' force parameter to use a bitmap image where a steganography signature was already detected.
+
+Use '-o' override parameter to override an existing output file.
+
+# Seed
+
+The seed parameter is optional and it will be used to compute the offset index in the bitmap where the data input will be concealed.
+
+If the seed parameter is not provided a random seed will be used and shown in the output console after data is concealed.
+
+But if either the "seed string" or "seed value" is provided in the encode process it must be provide exactly the same in the decode process.
