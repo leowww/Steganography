@@ -2,9 +2,19 @@
 
 From [Wikipedia](https://en.wikipedia.org/wiki/Steganography), **Steganography** is the practice of concealing a file, message, image, or video within another file, message, image, or video. The word steganography combines the Greek words steganos, meaning "covered, concealed, or protected", and graphein meaning "writing".
 
+#Bitmap
+
 This implementation only restrict the target file to bitmaps images because it is usually a large file with a small header footprint.
 
-A bitmap image file is composed of pixels
+A bitmap image is comprised of pixels in a matrix. Each pixel in the image contains information about the color to be displayed.
+
+Each pixel is encoded with the basic three colors - Red, Green, Blue - with one byte per color.
+
+Changing the least significants bits (LSB) of each pixel have a very little impact in the bitmap image.
+
+We use only the two LSB of each color bit of the bitmap image to encode the data file.
+
+To encode one byte of data we use four bytes of the bitmap image.
 
 # Maven 
 
@@ -59,6 +69,8 @@ Use '-o' override parameter to override an existing output file.
 
 The seed parameter is optional and it will be used to compute the offset index in the bitmap where the data input will be concealed.
 
-If the seed parameter is not provided a random seed will be used and shown in the output console after data is concealed.
+You always need to provide the same seed used in the encode process to successfully decode the data concealed.
 
-But if either the "seed string" or "seed value" is provided in the encode process it must be provide exactly the same in the decode process.
+When the seed parameter is not provided a random seed will be used and shown in the output console after data is concealed. This seed must be noted to be use in the decode process.
+
+If either the '-ss' "seed string" or '-sv' "seed value" is provided in the encode process it must be provide exactly the same type and value in the decode process to retrieve the data concealed.

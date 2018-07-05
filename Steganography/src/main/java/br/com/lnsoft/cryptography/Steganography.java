@@ -23,22 +23,72 @@ public class Steganography {
 
 	private long seed;
 
+	/**
+	 * Create an instance with a random seed.
+	 */
 	public Steganography() {
-		setSeed(null);
+		this(null);
 	}
 
+	/**
+	 * Create an instance with a string seed.
+	 * 
+	 * @param seedString
+	 *            the string used to generate seed
+	 */
+	public Steganography(final String seedString) {
+		setSeed(seedString);
+	}
+
+	/**
+	 * Create an instance with a long seed value.
+	 * 
+	 * @param seedValue
+	 *            the long seed value
+	 */
+	public Steganography(final long seedValue) {
+		setSeed(seedValue);
+	}
+
+	/**
+	 * Get this instance seed value.
+	 * 
+	 * @return seed
+	 */
 	public long getSeed() {
 		return seed;
 	}
 
+	/**
+	 * Set the seed string.
+	 * 
+	 * @param seedString
+	 */
 	public void setSeed(final String seedString) {
 		seed = computeSeedString(seedString);
 	}
 
-	public void setSeed(final long seed) {
-		this.seed = seed;
+	/**
+	 * Set the seed value.
+	 * 
+	 * @param seedValue
+	 */
+	public void setSeed(final long seedValue) {
+		this.seed = seedValue;
 	}
 
+	/**
+	 * Encode data within bitmap image.
+	 * 
+	 * @param image
+	 *            byte array of the original image
+	 * @param data
+	 *            byte array of the data
+	 * @param force
+	 *            flag to force encode an already encoded bitmap image
+	 * @return byte array of the encoded image
+	 * @throws Exception
+	 */
 	public byte[] encodeData(final byte[] image, final byte[] data, final boolean force) throws Exception {
 		byte[] encodeData;
 		// check first two bytes bitmap identification
@@ -68,6 +118,14 @@ public class Steganography {
 		return encodeData;
 	}
 
+	/**
+	 * Decode the data within the encoded image.
+	 * 
+	 * @param image
+	 *            byte array with the encoded image
+	 * @return byte array with the data decoded
+	 * @throws Exception
+	 */
 	public byte[] decodeData(final byte[] image) throws Exception {
 		byte[] decodeData;
 		// check first two bytes bitmap identification
